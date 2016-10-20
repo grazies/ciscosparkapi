@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Ciscosparkapi by grazies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Ciscosparkapi</h1>
+      <h2 class="project-tagline">Simple, lightweight, scalable Python API wrapper for the Cisco Spark APIs</h2>
+      <a href="https://github.com/grazies/ciscosparkapi" class="btn">View on GitHub</a>
+      <a href="https://github.com/grazies/ciscosparkapi/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/grazies/ciscosparkapi/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1></h1>
+
+<h1>
+<a id="ciscosparkapi" class="anchor" href="#ciscosparkapi" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>ciscosparkapi</h1>
+
+<hr>
+
+<h2>
+<a id="simple-lightweight-scalable-python-api-wrapper-for-the-cisco-spark-apis" class="anchor" href="#simple-lightweight-scalable-python-api-wrapper-for-the-cisco-spark-apis" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Simple, lightweight, scalable Python API wrapper for the Cisco Spark APIs</h2>
+
+<p>.. image:: <a href="https://img.shields.io/pypi/v/ciscosparkapi.svg">https://img.shields.io/pypi/v/ciscosparkapi.svg</a>
+    :target: <a href="https://pypi.python.org/pypi/ciscosparkapi">https://pypi.python.org/pypi/ciscosparkapi</a></p>
+
+<p>Sure, working with the Cisco Spark APIs is easy (see <code>developer.ciscospark.com</code>_).  They are <em>RESTful</em>,  <em>naturally structured</em>, require only a <em>simple Access Token for authentication</em>, and <em>the data is elegantly represented in intuitive JSON</em>.  What could be easier?</p>
+
+<p>.. code-block:: python</p>
+
+<pre><code>import requests
+
+URL = 'https://api.ciscospark.com/v1/messages'
+ACCESS_TOKEN = '&lt;your_access_token&gt;'
+ROOM_ID = '&lt;room_id&gt;'
+MESSAGE_TEXT = '&lt;message_text&gt;'
+
+headers = {'Authorization': 'Bearer ' + ACCESS_TOKEN,
+           'Content-type': 'application/json;charset=utf-8'}
+post_data = {'roomId': ROOM_ID,
+             'text': MESSAGE_TEXT}
+response = requests.post(URL, json=post_data, headers=headers)
+if response.status_code == 200:
+    # Great your message was posted!
+    message_id = response.json['id']
+    message_text = response.json['id']
+    print("New message created, with ID:", message_id)
+    print(message_text)
+else:
+    # Oops something went wrong...  Better do something about it.
+    print(response.status_code, response.text)
+</code></pre>
+
+<p>Like I said, <em>EASY</em>.  However, in use, the code can be rather repetitive...</p>
+
+<ul>
+<li>You have to setup the environment every time</li>
+<li>You have to remember URLs and request arguments (or reference the docs)</li>
+<li>You have to parse the returned JSON and setup variables to hold the attributes you need</li>
+<li>When requesting lists of items, you have to deal with pagination_</li>
+</ul>
+
+<p>Enter <strong>ciscosparkapi</strong>, a simple API wrapper that wraps all of the Spark API calls and returned JSON objects within native Python objects and function calls.</p>
+
+<p>With ciscosparkapi, the above Python code can be consolidated to the following:</p>
+
+<p>.. code-block:: python</p>
+
+<pre><code>from ciscosparkapi import CiscoSparkAPI
+
+api = CiscoSparkAPI()
+try:
+    message = api.messages.create('&lt;room_id&gt;', text='&lt;message_text&gt;')
+    print("New message created, with ID:", message.id)
+    print(message.text)
+except SparkApiError as e:
+    print(e)
+</code></pre>
+
+<p>The ciscosparkapi package handles all of this for you:</p>
+
+<ul>
+<li>Reads your Spark access token from a <code>SPARK_ACCESS_TOKEN</code> environment variable</li>
+<li>Wraps and represents all Spark API calls as a simple hierarchical tree of native-Python methods (with default arguments provided everywhere possible!)</li>
+<li>If your Python IDE supports <strong>auto-completion</strong> (like PyCharm_), you can navigate the available methods and object attributes right within your IDE</li>
+<li>Represents all returned JSON objects as native Python objects - you can access all of the object's attributes using native <em>dot.syntax</em>
+</li>
+<li>
+<strong>Automatic and Transparent Pagination!</strong>  When requesting 'lists of objects' from Spark, requests for additional pages of responses are efficiently and automatically requested as needed</li>
+<li>Multipart encoding and uploading of local files, when creating messages with local file attachments</li>
+</ul>
+
+<p>All of this, combined, lets you do powerful things simply:</p>
+
+<p>.. code-block:: python</p>
+
+<pre><code>from ciscosparkapi import CiscoSparkAPI
+
+api = CiscoSparkAPI()
+
+# Find all rooms that have 'ciscosparkapi Demo' in their title
+all_rooms = api.rooms.list()
+demo_rooms = [room for room in all_rooms if 'ciscosparkapi Demo' in room.title]
+
+# Delete all of the demo rooms
+for room in demo_rooms:
+    api.rooms.delete(room.id)
+
+# Create a new demo room
+demo_room = api.rooms.create('ciscosparkapi Demo')
+
+# Add people to the new demo room
+email_addresses = ["test01@cmlccie.com", "test02@cmlccie.com"]
+for email in email_addresses:
+    api.memberships.create(demo_room.id, personEmail=email)
+
+# Post a message to the new room, and upload a file
+api.message.create(demo_room.id, text="Welcome to the room!", files=["welcome.jpg"])
+</code></pre>
+
+<p>That's more than six Spark API calls in less than 23 lines of script code (with comments)!
+...and likely more than that depending on how many rooms are returned by Spark (remember pagination is handled for you automatically)</p>
+
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>Installation and updating of ciscosparkapi is easy:</p>
+
+<p><strong>Install via PIP</strong></p>
+
+<p>.. code-block:: bash</p>
+
+<pre><code>$ pip install ciscosparkapi
+</code></pre>
+
+<p><strong>Upgrading to the latest Version</strong></p>
+
+<p>.. code-block:: bash</p>
+
+<pre><code>$ pip install ciscosparkapi --upgrade
+</code></pre>
+
+<h2>
+<a id="releases--release-notes" class="anchor" href="#releases--release-notes" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Releases &amp; Release Notes</h2>
+
+<p>Complete and usable <em>Beta</em> releases_ have been published for this package.</p>
+
+<p>While the package APIs may change (while the package is in beta), the package capabilities should all be functional.  If you experience any issues using this package, please report them using the issues_ log.</p>
+
+<p>Please see the releases_ page for release notes on the incremental functionality and bug fixes that have been incorporated into the published releases.</p>
+
+<h2>
+<a id="examples" class="anchor" href="#examples" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Examples</h2>
+
+<p>Looking for some examples or sample scripts?  Check out the examples_ folder!</p>
+
+<p>Have a good example script you would like to share?  Please feel free to contribute!</p>
+
+<h2>
+<a id="documentation" class="anchor" href="#documentation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Documentation</h2>
+
+<p>All of the user-facing methods have complete docstrings.  You can view the docstrings for any method either from the <code>source files</code>_, or by using the Python <code>help()</code> function.</p>
+
+<p>.. code-block:: python</p>
+
+<pre><code>&gt;&gt;&gt; from ciscosparkapi import CiscoSparkAPI
+&gt;&gt;&gt; api = CiscoSparkAPI()
+&gt;&gt;&gt; help(api.messages.create)
+create(self, roomId=None, toPersonId=None, toPersonEmail=None, text=None, markdown=None, files=None) method of ciscosparkapi.api.messages.MessagesAPI instance
+    Posts a message to a room.
+
+    Posts a message, and optionally, a media content attachment, to a room.
+
+    You must specify either a roomId, toPersonId or toPersonEmail when
+    posting a message, and you must supply some message content (text,
+    markdown, files).
+
+    Args:
+        roomId(string_types): The room ID.
+        toPersonId(string_types): The ID of the recipient when sending a
+            private 1:1 message.
+ ...
+</code></pre>
+
+<p>Full standalone online documentation is coming soon (it's on the backlog!).</p>
+
+<h2>
+<a id="contribution" class="anchor" href="#contribution" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Contribution</h2>
+
+<p>ciscosparkapi_ and it's sister project ciscosparksdk_ are community development projects.  Feedback, thoughts, ideas and code contributions are most welcome!</p>
+
+<p>To contribute to ciscosparkapi please use the following resources:</p>
+
+<p>Feedback, issues, thoughts and ideas... Please use the issues_ log.</p>
+
+<p>Interested in contributing code?</p>
+
+<h1>
+<a id="-check-for-open-issues_-or-create-a-new-one" class="anchor" href="#-check-for-open-issues_-or-create-a-new-one" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>. Check for open issues_ or create a new one.</h1>
+
+<ul>
+<li>Assign yourself to the issue you want to work on, and communicate with any others that may be working the issue.</li>
+<li>Project workflow is being managed via the GitHub projects_ feature.  Move your issue to the 'In Progress' column of the project being worked.</li>
+</ul>
+
+<h1>
+<a id="-review-the-project-charter_-for-coding-standards-and-practices" class="anchor" href="#-review-the-project-charter_-for-coding-standards-and-practices" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>. Review the project charter_ for coding standards and practices.</h1>
+
+<h1>
+<a id="-fork-a-copy-of-the-repository_" class="anchor" href="#-fork-a-copy-of-the-repository_" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>. Fork a copy of <code>the repository</code>_.</h1>
+
+<h1>
+<a id="-add-your-code-to-your-forked-repository" class="anchor" href="#-add-your-code-to-your-forked-repository" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>. Add your code to your forked repository.</h1>
+
+<h1>
+<a id="-submit-a-pull-request-and-move-your-issue-to-the-code-review-column-on-the-projects-page" class="anchor" href="#-submit-a-pull-request-and-move-your-issue-to-the-code-review-column-on-the-projects-page" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>. Submit a <code>pull request</code><em>, and move your issue to the 'Code Review' column on the projects</em> page.</h1>
+
+<p>.. <em>developer.ciscospark.com: <a href="https://developer.ciscospark.com">https://developer.ciscospark.com</a>
+.. _pagination: <a href="https://developer.ciscospark.com/pagination.html">https://developer.ciscospark.com/pagination.html</a>
+.. _PyCharm: <a href="https://www.jetbrains.com/pycharm/">https://www.jetbrains.com/pycharm/</a>
+.. _examples: <a href="https://github.com/CiscoDevNet/ciscosparkapi/tree/master/examples">https://github.com/CiscoDevNet/ciscosparkapi/tree/master/examples</a>
+.. _source files: <a href="https://github.com/CiscoDevNet/ciscosparkapi/tree/master/ciscosparkapi">https://github.com/CiscoDevNet/ciscosparkapi/tree/master/ciscosparkapi</a>
+.. _ciscosparkapi: <a href="https://github.com/CiscoDevNet/ciscosparkapi">https://github.com/CiscoDevNet/ciscosparkapi</a>
+.. _ciscosparksdk: <a href="https://github.com/CiscoDevNet/ciscosparksdk">https://github.com/CiscoDevNet/ciscosparksdk</a>
+.. _issues: <a href="https://github.com/CiscoDevNet/ciscosparkapi/issues">https://github.com/CiscoDevNet/ciscosparkapi/issues</a>
+.. _projects: <a href="https://github.com/CiscoDevNet/ciscosparkapi/projects">https://github.com/CiscoDevNet/ciscosparkapi/projects</a>
+.. _pull requests: <a href="https://github.com/CiscoDevNet/ciscosparkapi/pulls">https://github.com/CiscoDevNet/ciscosparkapi/pulls</a>
+.. _releases: <a href="https://github.com/CiscoDevNet/ciscosparkapi/releases">https://github.com/CiscoDevNet/ciscosparkapi/releases</a>
+.. _charter: <a href="https://github.com/CiscoDevNet/spark-python-packages-team/blob/master/Charter.md">https://github.com/CiscoDevNet/spark-python-packages-team/blob/master/Charter.md</a>
+.. _the repository: ciscosparkapi</em>
+.. <em>pull request: <code>pull requests</code></em></p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/grazies/ciscosparkapi">Ciscosparkapi</a> is maintained by <a href="https://github.com/grazies">grazies</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
